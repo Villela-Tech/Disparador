@@ -1,0 +1,72 @@
+{
+  "manifest_version": 3,
+  "update_url": "https://clients2.google.com/service/update2/crx",
+  "name": "Sender - Envio de Mensagens em Massa",
+  "version": "9.2",
+  "default_locale": "en",
+  "description": "__MSG_Desc__",
+  "icons": {
+    "16": "logo/small.png",
+    "48": "logo/medium.png",
+    "128": "logo/large.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://web.whatsapp.com/*"
+      ],
+      "js": [
+        "js/library/jquery.js",
+        "js/Utils/data.js",
+        "js/Utils/ga-code.js",
+        "js/Utils/helper.js",
+        "js/Utils/popup-handler.js",
+        "js/Utils/messenger.js",
+        "js/Utils/conversation-banks.js",
+        "js/content.js"
+      ],
+      "css": [
+        "css/content.css"
+      ]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "/js/inject.js",
+        "/logo/*",
+        "/sounds/*",
+        "/Keys.json"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ],
+  "background": {
+    "service_worker": "js/background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Pro Sender"
+  },
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "notifications",
+    "tabs",
+    "activeTab",
+    "identity",
+    "identity.email"
+  ],
+  "host_permissions": [
+    "https://villela-tech.github.io/*",
+    "https://raw.githubusercontent.com/*",
+    "https://docs.google.com/*",
+    "https://www.horariodebrasilia.org/*",
+    "https://hook.us1.make.com/*",
+    "https://api.growsoft.io/*"
+  ]
+}
+
