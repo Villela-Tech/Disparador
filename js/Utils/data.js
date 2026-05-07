@@ -105,6 +105,14 @@ let DOCUMENT_ELEMENT_SELECTORS = {
         "[data-animate-modal-popup=\"true\"]:not(:has(svg circle)) button"
     ],
     send_message_btn: [
+        // WhatsApp Web muda frequentemente o DOM do botão de enviar.
+        // Preferir o botão (clickável) e manter spans como fallback.
+        "button[data-testid=\"send\"]",
+        "button[aria-label=\"Enviar\"]",
+        "button[aria-label*=\"Send\"]",
+        "#main footer button[data-testid=\"send\"]",
+        "#main footer button:has(span[data-icon=\"send\"])",
+        "button:has(span[data-icon=\"send\"])",
         "span[data-icon=\"send\"]"
     ]
 };

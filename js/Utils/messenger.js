@@ -245,7 +245,10 @@ async function sendMessageToNumber(number, message) {
             setTimeout(() => {
                 let send_message_btn = getDocumentElement('send_message_btn');
                 if (send_message_btn) {
-                    send_message_btn.click();
+                    // Em versões novas, o seletor pode retornar o <span> do ícone.
+                    // Garantir clique no <button> ancestral quando existir.
+                    const clickableBtn = send_message_btn.closest?.('button') || send_message_btn;
+                    clickableBtn.click();
                     trackSuccess('send_message_to_number_success');
                     resolve({ is_message_sent: 'YES', comments: '' });
                 } else {
