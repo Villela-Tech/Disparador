@@ -81,12 +81,20 @@ async function messenger(numbers, message, time_gap, csv_data, customization, ca
     // chrome.storage.local.set({ 'attachmentsData': [] });
     campaignRunningIndex = null;
 
-    // Send notification
-    chrome.runtime.sendMessage({
-        type: 'send_notification',
-        title: 'Suas mensagens foram enviadas',
-        message: 'Abra a extensão para baixar o relatório',
-    });
+    // Notificação alinhada ao resultado real (evita "enviadas" com 0 entregues)
+    if (finalCount > 0) {
+        chrome.runtime.sendMessage({
+            type: 'send_notification',
+            title: 'Suas mensagens foram enviadas',
+            message: 'Abra a extensão para baixar o relatório',
+        });
+    } else {
+        chrome.runtime.sendMessage({
+            type: 'send_notification',
+            title: 'Campanha encerrada',
+            message: 'Nenhum envio concluído com sucesso. Abra o relatório e confira o WhatsApp Web.',
+        });
+    }
 
     playSound('campaign_end');
 
@@ -169,9 +177,19 @@ async function executeCampaign(numbers, messages, captions, attachments, start_i
         }
 
 
-        let final_comments = [message_comments, attachments_comments].filter(comment => comment.length > 0).join(' ; ');
-        if (final_comments.length == 0) {
-            final_comments = '-';
+        const mc = (message_comments != null ? String(message_comments) : '').trim();
+        const ac = (attachments_comments != null ? String(attachments_comments) : '').trim();
+        let final_comments = [mc, ac].filter((c) => c.length > 0).join(' ; ') || '-';
+
+        const hadText = !!(curr_message && String(curr_message).trim().length);
+        const hadAtt = !!(attachments && attachments.length > 0);
+        let rowDelivered = false;
+        if (is_chat_opened && (hadText || hadAtt)) {
+            rowDelivered =
+                (!hadText || is_message_sent === 'YES') &&
+                (!hadAtt || is_attachments_sent === 'YES');
+        }
+        if (rowDelivered) {
             sent_count++;
         }
 
@@ -184,7 +202,7 @@ async function executeCampaign(numbers, messages, captions, attachments, start_i
 
         // Track success / failed events
         if (is_message_sent != '-') {
-            if (message_comments.length == 0) {
+            if ((message_comments || '').length === 0) {
                 trackSystemEvent('send_message_success_total');
             } else if (is_chat_opened) {
                 not_sent_message_count++;
@@ -192,7 +210,7 @@ async function executeCampaign(numbers, messages, captions, attachments, start_i
             }
         }
         if (is_attachments_sent != '-') {
-            if (attachments_comments.length == 0) {
+            if ((attachments_comments || '').length === 0) {
                 trackSystemEvent('send_attachments_success_total');
             } else if (is_chat_opened) {
                 not_sent_attachments_count++;
@@ -443,14 +461,21 @@ async function sendAttachmentsToGroup(group_id, attachments, caption, wait_till_
 async function openNumber(number, message = '', time_gap = 1) {
     try {
         const text = message ? encodeURIComponent(message) : '';
-        let has_opened = await openNumberTab(`https://api.whatsapp.com/send?phone=${number}&text=${text}`); // Old Url
-
+        const clean = String(number).replace(/\D/g, '');
+        // 1) Mesma origem do Web WhatsApp — abre o chat no SPA (wa.me/api costuma falhar ou sair do contexto)
+        let has_opened = await openNumberTab(
+            `https://web.whatsapp.com/send?phone=${clean}${text ? '&text=' + text : ''}`,
+            clean
+        );
         if (!has_opened) {
-            has_opened = await openNumberTab(`https://wa.me/${number}?text=${text}`); // New Url
+            has_opened = await openNumberTab(`https://api.whatsapp.com/send?phone=${clean}&text=${text}`, clean);
+        }
+        if (!has_opened) {
+            has_opened = await openNumberTab(`https://wa.me/${clean}?text=${text}`, clean);
         }
 
         if (!has_opened) {
-            invalid_numbers.push(`+${number}`);
+            invalid_numbers.push(`+${clean}`);
         } else {
             await delay(time_gap * 1000);
         }
@@ -463,7 +488,7 @@ async function openNumber(number, message = '', time_gap = 1) {
     }
 }
 
-async function openNumberTab(link) {
+async function openNumberTab(link, cleanDigits) {
     let linkElement = document.getElementById("whatsapp-message-sender");
     if (!linkElement) {
         linkElement = document.createElement("a");
@@ -472,43 +497,53 @@ async function openNumberTab(link) {
     }
 
     linkElement.setAttribute("href", link);
+    linkElement.setAttribute("target", "_self");
+    linkElement.setAttribute("rel", "opener");
     linkElement.click();
 
-    return await hasChatOpened();
+    return await hasChatOpened(cleanDigits);
 }
 
-async function hasChatOpened() {
-    return new Promise((resolve, reject) => {
-        let is_chat_loading = false;
-        let wait_time_ms = 0;
+async function hasChatOpened(cleanDigits) {
+    const maxWait = 25000;
+    const step = 250;
+    let waited = 0;
 
-        let checkChatOpenedInterval = setInterval(() => {
-            wait_time_ms += 100;
+    const composeReady = () =>
+        !!(getDocumentElement('input_message_div') || getDocumentElement('conversation_compose_div'));
+    const invalidPopup = () => !!getDocumentElement('invalid_chat_popup');
 
-            const starting_chat_popup = getDocumentElement('starting_chat_popup');
-            const invalid_chat_popup = getDocumentElement('invalid_chat_popup');
-
-            if (starting_chat_popup || wait_time_ms >= 500) {
-                is_chat_loading = true;
+    const urlMatchesExpectedChat = () => {
+        if (!cleanDigits) return true;
+        try {
+            const href = typeof location !== 'undefined' && location.href ? location.href : '';
+            if (href.includes('send?phone=')) {
+                return href.replace(/\D/g, '').includes(String(cleanDigits).replace(/\D/g, ''));
             }
+            return true;
+        } catch (e) {
+            return true;
+        }
+    };
 
-            if (is_chat_loading) {
-                if (invalid_chat_popup || wait_time_ms >= 10000) {
-                    // Handle the invalid chat popup if it's displayed
-                    const invalid_chat_ok_btn = getDocumentElement('invalid_popup_ok_btn');
-                    if (invalid_chat_ok_btn) {
-                        invalid_chat_ok_btn.click();
-                    }
+    while (waited < maxWait) {
+        await delay(step);
+        waited += step;
 
-                    clearInterval(checkChatOpenedInterval);
-                    resolve(false);
-                } else if (!starting_chat_popup) {
-                    clearInterval(checkChatOpenedInterval);
-                    resolve(true);
-                }
+        if (invalidPopup()) {
+            const invalid_chat_ok_btn = getDocumentElement('invalid_popup_ok_btn');
+            if (invalid_chat_ok_btn) {
+                invalid_chat_ok_btn.click();
             }
-        }, 100);
-    });
+            return false;
+        }
+
+        if (composeReady() && urlMatchesExpectedChat()) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 function getCurrentChatNumber() {

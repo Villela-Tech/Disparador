@@ -77,9 +77,12 @@ let DOCUMENT_ELEMENT_SELECTORS = {
         "._1alON"
     ],
     input_message_div: [
+        "[data-testid=\"conversation-compose-box-input\"]",
         "#main [contenteditable=\"true\"][role=\"textbox\"]",
         "#main p.selectable-text.copyable-text",
         "[aria-placeholder=\"Type a message\"]",
+        "[aria-placeholder=\"Digite uma mensagem\"]",
+        "[aria-placeholder*=\"mensagem\"]",
         "[aria-activedescendant]"
     ],
     footer_div: [
@@ -98,7 +101,7 @@ let DOCUMENT_ELEMENT_SELECTORS = {
     ],
     invalid_chat_popup: [
         "[aria-label='Phone number shared via url is invalid.']",
-        "[data-animate-modal-popup=\"true\"]:not(:has(svg circle))"
+        "[aria-label*=\"número de telefone compartilhado\"]"
     ],
     invalid_popup_ok_btn: [
         "[data-testid=\"popup-controls-ok\"]",

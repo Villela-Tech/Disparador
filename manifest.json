@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "update_url": "https://clients2.google.com/service/update2/crx",
   "name": "Sender - Envio de Mensagens em Massa",
-  "version": "9.3",
+  "version": "9.5",
   "default_locale": "en",
   "description": "__MSG_Desc__",
   "icons": {
