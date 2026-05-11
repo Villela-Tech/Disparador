@@ -270,12 +270,31 @@ const initProSender = function () {
 
             const normalizedChatId = normalizeChatId(chatid);
 
+            // Resolver chat igual ao envio de texto: get → _find → find (e wid quando existir)
+            const resolveChatForAttachment = async (jid) => {
+                let chat = window.Store?.Chat?.get?.(jid);
+                const wid = window.Store?.WidFactory?.createWid ? window.Store.WidFactory.createWid(jid) : null;
+                if (!chat && wid && window.Store?.Chat?.get) {
+                    try { chat = window.Store.Chat.get(wid); } catch (e) {}
+                }
+                if (!chat && window.Store.Chat._find) {
+                    try { chat = await window.Store.Chat._find(jid); } catch (e) {}
+                    if (!chat && wid) {
+                        try { chat = await window.Store.Chat._find(wid); } catch (e2) {}
+                    }
+                }
+                if (!chat && window.Store.Chat.find) {
+                    try { chat = await window.Store.Chat.find(jid); } catch (e) {}
+                    if (!chat && wid) {
+                        try { chat = await window.Store.Chat.find(wid); } catch (e2) {}
+                    }
+                }
+                return chat || null;
+            };
+
             // Método 1: MediaPrep (API oficial do WhatsApp Web - mais confiável)
             if (window.Store?.MediaPrep?.MediaPrep && window.Store?.MsgType) {
-                let chat = window.Store.Chat.get(normalizedChatId);
-                if (!chat && window.Store.Chat.find) {
-                    try { chat = await window.Store.Chat.find(normalizedChatId); } catch (e) {}
-                }
+                let chat = await resolveChatForAttachment(normalizedChatId);
                 if (!chat) throw new Error("Chat no encontrado: " + normalizedChatId);
 
                 const getMsgType = (file) => {
@@ -334,11 +353,7 @@ const initProSender = function () {
             }
 
             // Método 3: Fallback - MediaCollection (método antigo)
-            const chatIdObj = window.Store?.WidFactory?.createWid ? window.Store.WidFactory.createWid(normalizedChatId) : normalizedChatId;
-            let chat = window.Store?.Chat?.get ? window.Store.Chat.get(chatIdObj) : null;
-            if (!chat && window.Store?.Chat?.find) {
-                try { chat = await window.Store.Chat.find(chatIdObj); } catch (e) {}
-            }
+            let chat = await resolveChatForAttachment(normalizedChatId);
             if (!chat) throw new Error("Chat no encontrado: " + normalizedChatId);
 
             const mc = new window.Store.MediaCollection(chat);

@@ -369,25 +369,21 @@ async function sendMessageToGroup(group_id, message) {
 }
 
 async function handleAttachmentsSend(number, group_id, attachments, caption, is_message_sent, wait_till_send = false) {
-    if (is_message_sent === 'NO') {
-        return {
-            is_attachments_sent: 'NO',
-            comments: '',
-        }
-    }
-    else if (attachments && attachments.length > 0) {
+    // Não abortar anexos só porque o texto falhou: no WhatsApp Web atualizado o envio de texto
+    // (API/DOM) pode falhar enquanto o chat está aberto e válido; mídia usa outro caminho (Store/MediaPrep).
+    // Antes isso impedia qualquer anexo após um "NO" na mensagem.
+    if (attachments && attachments.length > 0) {
         if (number) {
             return await sendAttachmentsToNumber(number, attachments, caption, wait_till_send);
         }
         if (group_id) {
             return await sendAttachmentsToGroup(group_id, attachments, caption, wait_till_send);
         }
-    } else {
-        return {
-            is_attachments_sent: '-',
-            comments: ''
-        }
     }
+    return {
+        is_attachments_sent: '-',
+        comments: ''
+    };
 }
 
 async function sendAttachmentsToNumber(number, attachments, caption, wait_till_send) {
